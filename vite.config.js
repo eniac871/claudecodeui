@@ -10,6 +10,7 @@ export default defineConfig(({ command, mode }) => {
     plugins: [react()],
     server: {
       port: parseInt(env.VITE_PORT) || 5173,
+      allowedHosts: ['aristocratically-unsunburnt-halina.ngrok-free.dev'],
       proxy: {
         '/api': `http://localhost:${env.PORT || 3001}`,
         '/ws': {
@@ -17,7 +18,7 @@ export default defineConfig(({ command, mode }) => {
           ws: true
         },
         '/shell': {
-          target: `ws://localhost:${env.PORT || 3002}`,
+          target: `ws://localhost:${env.PORT || 3001}`,
           ws: true
         }
       }

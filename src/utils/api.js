@@ -86,6 +86,28 @@ export const api = {
     }),
   getFiles: (projectName) =>
     authenticatedFetch(`/api/projects/${projectName}/files`),
+  createFolder: (projectName, folderPath) =>
+    authenticatedFetch(`/api/projects/${projectName}/folder`, {
+      method: 'POST',
+      body: JSON.stringify({ folderPath }),
+    }),
+  uploadFiles: (projectName, files, targetDir = '') => {
+    const formData = new FormData();
+    files.forEach(file => formData.append('files', file));
+
+    const isPlatform = import.meta.env.VITE_IS_PLATFORM === 'true';
+    const token = localStorage.getItem('auth-token');
+    const headers = {};
+    if (!isPlatform && token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    return fetch(`/api/projects/${projectName}/upload?targetDir=${encodeURIComponent(targetDir)}`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+  },
   transcribe: (formData) =>
     authenticatedFetch('/api/transcribe', {
       method: 'POST',

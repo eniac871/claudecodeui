@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Folder, FolderOpen, File, FileText, FileCode, List, TableProperties, Eye, Search, X } from 'lucide-react';
+import { Folder, FolderOpen, File, FileText, FileCode, List, TableProperties, Eye, Search, X, FolderPlus, Upload, Plus, RefreshCw } from 'lucide-react';
 import { cn } from '../lib/utils';
 import CodeEditor from './CodeEditor';
 import ImageViewer from './ImageViewer';
@@ -14,9 +14,21 @@ function FileTree({ selectedProject }) {
   const [expandedDirs, setExpandedDirs] = useState(new Set());
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedFolder, setSelectedFolder] = useState(null); // Track selected folder for uploads
   const [viewMode, setViewMode] = useState('detailed'); // 'simple', 'detailed', 'compact'
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredFiles, setFilteredFiles] = useState([]);
+
+  // New folder creation state
+  const [showNewFolderInput, setShowNewFolderInput] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [newFolderParent, setNewFolderParent] = useState(''); // Empty means root
+  const [creatingFolder, setCreatingFolder] = useState(false);
+
+  // File upload state
+  const [uploading, setUploading] = useState(false);
+  const [uploadTargetDir, setUploadTargetDir] = useState('');
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (selectedProject) {
@@ -115,6 +127,90 @@ function FileTree({ selectedProject }) {
     localStorage.setItem('file-tree-view-mode', mode);
   };
 
+  // Create new folder handler
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim() || !selectedProject) return;
+
+    setCreatingFolder(true);
+    try {
+      const folderPath = newFolderParent
+        ? `${newFolderParent}/${newFolderName.trim()}`
+        : newFolderName.trim();
+
+      const response = await api.createFolder(selectedProject.name, folderPath);
+      if (response.ok) {
+        // Refresh file tree
+        await fetchFiles();
+        // Reset form
+        setNewFolderName('');
+        setNewFolderParent('');
+        setShowNewFolderInput(false);
+        // Expand parent directory if set
+        if (newFolderParent) {
+          setExpandedDirs(prev => new Set(prev.add(newFolderParent)));
+        }
+      } else {
+        const error = await response.json();
+        alert(`Failed to create folder: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error creating folder:', error);
+      alert(`Error creating folder: ${error.message}`);
+    } finally {
+      setCreatingFolder(false);
+    }
+  };
+
+  // File upload handler
+  const handleFileUpload = async (event) => {
+    const files = event.target.files;
+    if (!files || files.length === 0 || !selectedProject) return;
+
+    setUploading(true);
+    try {
+      const response = await api.uploadFiles(
+        selectedProject.name,
+        Array.from(files),
+        uploadTargetDir
+      );
+
+      if (response.ok) {
+        // Refresh file tree
+        await fetchFiles();
+        // Expand target directory if set
+        if (uploadTargetDir) {
+          setExpandedDirs(prev => new Set(prev.add(uploadTargetDir)));
+        }
+      } else {
+        const error = await response.json();
+        alert(`Failed to upload files: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      alert(`Error uploading files: ${error.message}`);
+    } finally {
+      setUploading(false);
+      setUploadTargetDir('');
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Trigger file upload dialog
+  const triggerFileUpload = (targetDir = '') => {
+    setUploadTargetDir(targetDir);
+    fileInputRef.current?.click();
+  };
+
+  // Start creating folder in a specific directory
+  const startCreateFolder = (parentPath = '') => {
+    setNewFolderParent(parentPath);
+    setNewFolderName('');
+    setShowNewFolderInput(true);
+  };
+
   // Format file size
   const formatFileSize = (bytes) => {
     if (!bytes || bytes === 0) return '0 B';
@@ -145,10 +241,13 @@ function FileTree({ selectedProject }) {
           variant="ghost"
           className={cn(
             "w-full justify-start p-2 h-auto font-normal text-left hover:bg-accent",
+            item.type === 'directory' && selectedFolder === item.path && "bg-accent ring-1 ring-primary/50"
           )}
           style={{ paddingLeft: `${level * 16 + 12}px` }}
           onClick={() => {
             if (item.type === 'directory') {
+              // Toggle selection: if already selected, deselect; otherwise select
+              setSelectedFolder(prev => prev === item.path ? null : item.path);
               toggleDirectory(item.path);
             } else if (isImageFile(item.name)) {
               // Open image in viewer
@@ -172,9 +271,9 @@ function FileTree({ selectedProject }) {
           <div className="flex items-center gap-2 min-w-0 w-full">
             {item.type === 'directory' ? (
               expandedDirs.has(item.path) ? (
-                <FolderOpen className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                <FolderOpen className={cn("w-4 h-4 flex-shrink-0", selectedFolder === item.path ? "text-primary" : "text-blue-500")} />
               ) : (
-                <Folder className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <Folder className={cn("w-4 h-4 flex-shrink-0", selectedFolder === item.path ? "text-primary" : "text-muted-foreground")} />
               )
             ) : (
               getFileIcon(item.name)
@@ -228,10 +327,12 @@ function FileTree({ selectedProject }) {
         <div
           className={cn(
             "grid grid-cols-12 gap-2 p-2 hover:bg-accent cursor-pointer items-center",
+            item.type === 'directory' && selectedFolder === item.path && "bg-accent ring-1 ring-primary/50"
           )}
           style={{ paddingLeft: `${level * 16 + 12}px` }}
           onClick={() => {
             if (item.type === 'directory') {
+              setSelectedFolder(prev => prev === item.path ? null : item.path);
               toggleDirectory(item.path);
             } else if (isImageFile(item.name)) {
               setSelectedImage({
@@ -253,9 +354,9 @@ function FileTree({ selectedProject }) {
           <div className="col-span-5 flex items-center gap-2 min-w-0">
             {item.type === 'directory' ? (
               expandedDirs.has(item.path) ? (
-                <FolderOpen className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                <FolderOpen className={cn("w-4 h-4 flex-shrink-0", selectedFolder === item.path ? "text-primary" : "text-blue-500")} />
               ) : (
-                <Folder className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <Folder className={cn("w-4 h-4 flex-shrink-0", selectedFolder === item.path ? "text-primary" : "text-muted-foreground")} />
               )
             ) : (
               getFileIcon(item.name)
@@ -290,10 +391,12 @@ function FileTree({ selectedProject }) {
         <div
           className={cn(
             "flex items-center justify-between p-2 hover:bg-accent cursor-pointer",
+            item.type === 'directory' && selectedFolder === item.path && "bg-accent ring-1 ring-primary/50"
           )}
           style={{ paddingLeft: `${level * 16 + 12}px` }}
           onClick={() => {
             if (item.type === 'directory') {
+              setSelectedFolder(prev => prev === item.path ? null : item.path);
               toggleDirectory(item.path);
             } else if (isImageFile(item.name)) {
               setSelectedImage({
@@ -315,9 +418,9 @@ function FileTree({ selectedProject }) {
           <div className="flex items-center gap-2 min-w-0">
             {item.type === 'directory' ? (
               expandedDirs.has(item.path) ? (
-                <FolderOpen className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                <FolderOpen className={cn("w-4 h-4 flex-shrink-0", selectedFolder === item.path ? "text-primary" : "text-blue-500")} />
               ) : (
-                <Folder className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <Folder className={cn("w-4 h-4 flex-shrink-0", selectedFolder === item.path ? "text-primary" : "text-muted-foreground")} />
               )
             ) : (
               getFileIcon(item.name)
@@ -356,11 +459,55 @@ function FileTree({ selectedProject }) {
 
   return (
     <div className="h-full flex flex-col bg-card">
+      {/* Hidden file input for uploads */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        multiple
+        className="hidden"
+      />
+
       {/* Header with Search and View Mode Toggle */}
       <div className="p-4 border-b border-border space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-medium text-foreground">Files</h3>
           <div className="flex gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => fetchFiles()}
+              title="Refresh files"
+              disabled={loading}
+            >
+              <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => startCreateFolder(selectedFolder || '')}
+              title={selectedFolder ? `New folder in ${selectedFolder.split('/').pop() || selectedFolder.split('\\').pop()}` : "New folder in root"}
+            >
+              <FolderPlus className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn("h-8 p-0", selectedFolder ? "w-auto px-2" : "w-8")}
+              onClick={() => triggerFileUpload(selectedFolder || '')}
+              title={selectedFolder ? `Upload to ${selectedFolder.split('/').pop() || selectedFolder.split('\\').pop()}` : "Upload to root"}
+              disabled={uploading}
+            >
+              <Upload className={cn("w-4 h-4", uploading && "animate-pulse")} />
+              {selectedFolder && (
+                <span className="ml-1 text-xs max-w-20 truncate">
+                  {selectedFolder.split('/').pop() || selectedFolder.split('\\').pop()}
+                </span>
+              )}
+            </Button>
+            <div className="w-px h-6 bg-border mx-1" />
             <Button
               variant={viewMode === 'simple' ? 'default' : 'ghost'}
               size="sm"
@@ -390,6 +537,59 @@ function FileTree({ selectedProject }) {
             </Button>
           </div>
         </div>
+
+        {/* New Folder Input */}
+        {showNewFolderInput && (
+          <div className="flex gap-2 items-center">
+            <Input
+              type="text"
+              placeholder={newFolderParent ? `New folder in ${newFolderParent}` : "New folder name..."}
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreateFolder();
+                if (e.key === 'Escape') setShowNewFolderInput(false);
+              }}
+              className="h-8 text-sm flex-1"
+              autoFocus
+            />
+            <Button
+              size="sm"
+              className="h-8"
+              onClick={handleCreateFolder}
+              disabled={!newFolderName.trim() || creatingFolder}
+            >
+              {creatingFolder ? 'Creating...' : 'Create'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => setShowNewFolderInput(false)}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+
+        {/* Selected Folder Indicator */}
+        {selectedFolder && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-accent/50 rounded px-2 py-1">
+            <Folder className="w-3 h-3 text-primary" />
+            <span className="truncate flex-1">
+              Selected: <span className="text-foreground font-medium">{selectedFolder.split('/').pop() || selectedFolder.split('\\').pop()}</span>
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 hover:bg-accent"
+              onClick={() => setSelectedFolder(null)}
+              title="Clear selection"
+            >
+              <X className="w-3 h-3" />
+            </Button>
+          </div>
+        )}
 
         {/* Search Bar */}
         <div className="relative">
