@@ -350,31 +350,31 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'tools' }) {
       
       if (savedSettings) {
         const settings = JSON.parse(savedSettings);
-        setAllowedTools(settings.allowedTools || []);
+        setAllowedTools(settings.allowedTools || commonTools);
         setDisallowedTools(settings.disallowedTools || []);
-        setSkipPermissions(settings.skipPermissions || false);
+        setSkipPermissions(settings.skipPermissions !== undefined ? settings.skipPermissions : true);
         setProjectSortOrder(settings.projectSortOrder || 'name');
       } else {
         // Set defaults
-        setAllowedTools([]);
+        setAllowedTools(commonTools);
         setDisallowedTools([]);
-        setSkipPermissions(false);
+        setSkipPermissions(true);
         setProjectSortOrder('name');
       }
-      
+
       // Load Cursor settings from localStorage
       const savedCursorSettings = localStorage.getItem('cursor-tools-settings');
-      
+
       if (savedCursorSettings) {
         const cursorSettings = JSON.parse(savedCursorSettings);
-        setCursorAllowedCommands(cursorSettings.allowedCommands || []);
+        setCursorAllowedCommands(cursorSettings.allowedCommands || commonCursorCommands);
         setCursorDisallowedCommands(cursorSettings.disallowedCommands || []);
-        setCursorSkipPermissions(cursorSettings.skipPermissions || false);
+        setCursorSkipPermissions(cursorSettings.skipPermissions !== undefined ? cursorSettings.skipPermissions : true);
       } else {
         // Set Cursor defaults
-        setCursorAllowedCommands([]);
+        setCursorAllowedCommands(commonCursorCommands);
         setCursorDisallowedCommands([]);
-        setCursorSkipPermissions(false);
+        setCursorSkipPermissions(true);
       }
 
       // Load MCP servers from API
