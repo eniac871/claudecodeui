@@ -75,6 +75,16 @@ const runMigrations = () => {
       db.exec('ALTER TABLE users ADD COLUMN has_completed_onboarding BOOLEAN DEFAULT 0');
     }
 
+    if (!columnNames.includes('codespeaks_project_folder')) {
+      console.log('Running migration: Adding codespeaks_project_folder column');
+      db.exec('ALTER TABLE users ADD COLUMN codespeaks_project_folder TEXT');
+    }
+
+    if (!columnNames.includes('codespeaks_knowledge_folder')) {
+      console.log('Running migration: Adding codespeaks_knowledge_folder column');
+      db.exec('ALTER TABLE users ADD COLUMN codespeaks_knowledge_folder TEXT');
+    }
+
     console.log('Database migrations completed successfully');
   } catch (error) {
     console.error('Error running migrations:', error.message);
@@ -187,6 +197,24 @@ const userDb = {
     try {
       const row = db.prepare('SELECT has_completed_onboarding FROM users WHERE id = ?').get(userId);
       return row?.has_completed_onboarding === 1;
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  updateCodeSpeaksConfig: (userId, projectFolder, knowledgeFolder) => {
+    try {
+      const stmt = db.prepare('UPDATE users SET codespeaks_project_folder = ?, codespeaks_knowledge_folder = ? WHERE id = ?');
+      stmt.run(projectFolder, knowledgeFolder, userId);
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  getCodeSpeaksConfig: (userId) => {
+    try {
+      const row = db.prepare('SELECT codespeaks_project_folder, codespeaks_knowledge_folder FROM users WHERE id = ?').get(userId);
+      return row;
     } catch (err) {
       throw err;
     }
@@ -351,11 +379,53 @@ const githubTokensDb = {
   }
 };
 
+// Favorite Projects database operations
+const favoriteProjectsDb = {
+  addFavorite: (userId, projectPath) => {
+    try {
+      const stmt = db.prepare('INSERT OR IGNORE INTO favorite_projects (user_id, project_path) VALUES (?, ?)');
+      const result = stmt.run(userId, projectPath);
+      return result.changes > 0;
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  removeFavorite: (userId, projectPath) => {
+    try {
+      const stmt = db.prepare('DELETE FROM favorite_projects WHERE user_id = ? AND project_path = ?');
+      const result = stmt.run(userId, projectPath);
+      return result.changes > 0;
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  getFavorites: (userId) => {
+    try {
+      const rows = db.prepare('SELECT project_path FROM favorite_projects WHERE user_id = ? ORDER BY created_at DESC').all(userId);
+      return rows.map(row => row.project_path);
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  isFavorite: (userId, projectPath) => {
+    try {
+      const row = db.prepare('SELECT 1 FROM favorite_projects WHERE user_id = ? AND project_path = ?').get(userId, projectPath);
+      return !!row;
+    } catch (err) {
+      throw err;
+    }
+  }
+};
+
 export {
   db,
   initializeDatabase,
   userDb,
   apiKeysDb,
   credentialsDb,
-  githubTokensDb // Backward compatibility
+  githubTokensDb, // Backward compatibility
+  favoriteProjectsDb
 };

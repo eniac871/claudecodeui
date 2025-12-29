@@ -250,9 +250,16 @@ async function generateDisplayName(projectName, actualProjectDir = null) {
     // Fall back to path-based naming if package.json doesn't exist or can't be read
   }
   
-  // If it starts with /, it's an absolute path
-  if (projectPath.startsWith('/')) {
-    const parts = projectPath.split('/').filter(Boolean);
+  // Handle absolute paths (both Unix and Windows)
+  if (path.isAbsolute(projectPath) || projectPath.startsWith('/')) {
+    const separator = projectPath.includes('\\') ? '\\' : '/';
+    const parts = projectPath.split(separator).filter(Boolean);
+    
+    // Return last 2 folder levels if available
+    if (parts.length >= 2) {
+      return `${parts[parts.length - 2]}${separator}${parts[parts.length - 1]}`;
+    }
+    
     // Return only the last folder name
     return parts[parts.length - 1] || projectPath;
   }

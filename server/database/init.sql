@@ -50,3 +50,15 @@ CREATE TABLE IF NOT EXISTS user_credentials (
 CREATE INDEX IF NOT EXISTS idx_user_credentials_user_id ON user_credentials(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_credentials_type ON user_credentials(credential_type);
 CREATE INDEX IF NOT EXISTS idx_user_credentials_active ON user_credentials(is_active);
+
+-- Favorite Projects table
+CREATE TABLE IF NOT EXISTS favorite_projects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    project_path TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(user_id, project_path)
+);
+
+CREATE INDEX IF NOT EXISTS idx_favorite_projects_user_id ON favorite_projects(user_id);

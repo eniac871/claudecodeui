@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { X, Plus, Settings as SettingsIcon, Shield, AlertTriangle, Moon, Sun, Server, Edit3, Trash2, Globe, Terminal, Zap, FolderOpen, LogIn, Key, GitBranch, Check } from 'lucide-react';
+import { X, Plus, Settings as SettingsIcon, Shield, AlertTriangle, Moon, Sun, Server, Edit3, Trash2, Globe, Terminal, Zap, FolderOpen, LogIn, Key, GitBranch, Check, MessageSquare } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import ClaudeLogo from './ClaudeLogo';
 import CursorLogo from './CursorLogo';
@@ -22,6 +22,10 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'tools' }) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
   const [projectSortOrder, setProjectSortOrder] = useState('name');
+
+  // CodeSpeaks Settings
+  const [codespeaksProjectFolder, setCodespeaksProjectFolder] = useState('');
+  const [codespeaksKnowledgeFolder, setCodespeaksKnowledgeFolder] = useState('');
 
   const [mcpServers, setMcpServers] = useState([]);
   const [showMcpForm, setShowMcpForm] = useState(false);
@@ -378,6 +382,14 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'tools' }) {
       
       // Load Cursor MCP servers
       await fetchCursorMcpServers();
+
+      // Load CodeSpeaks config
+      const codespeaksResponse = await authenticatedFetch('/api/user/codespeaks-config');
+      if (codespeaksResponse.ok) {
+        const data = await codespeaksResponse.json();
+        setCodespeaksProjectFolder(data.projectFolder || '');
+        setCodespeaksKnowledgeFolder(data.knowledgeFolder || '');
+      }
     } catch (error) {
       console.error('Error loading tool settings:', error);
       setAllowedTools([]);
@@ -472,7 +484,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'tools' }) {
     }
   };
 
-  const saveSettings = () => {
+  const saveSettings = async () => {
     setIsSaving(true);
     setSaveStatus(null);
     
@@ -497,9 +509,21 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'tools' }) {
       // Save to localStorage
       localStorage.setItem('claude-settings', JSON.stringify(claudeSettings));
       localStorage.setItem('cursor-tools-settings', JSON.stringify(cursorSettings));
-      
+
+      // Save CodeSpeaks config
+      await authenticatedFetch('/api/user/codespeaks-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          projectFolder: codespeaksProjectFolder,
+          knowledgeFolder: codespeaksKnowledgeFolder
+        })
+      });
+
       setSaveStatus('success');
-      
+
       setTimeout(() => {
         onClose();
       }, 1000);
@@ -758,6 +782,17 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'tools' }) {
                 API & Tokens
               </button>
               <button
+                onClick={() => setActiveTab('codespeaks')}
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'codespeaks'
+                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <MessageSquare className="w-4 h-4 inline mr-2" />
+                CodeSpeaks
+              </button>
+              <button
                 onClick={() => setActiveTab('tasks')}
                 className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === 'tasks'
@@ -996,6 +1031,50 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'tools' }) {
 
             {/* Git Tab */}
             {activeTab === 'git' && <GitSettings />}
+
+            {/* CodeSpeaks Tab */}
+            {activeTab === 'codespeaks' && (
+              <div className="space-y-6 md:space-y-8">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <MessageSquare className="w-5 h-5 text-blue-500" />
+                    <h3 className="text-lg font-medium text-foreground">
+                      CodeSpeaks Configuration
+                    </h3>
+                  </div>
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Project Folder Path
+                      </label>
+                      <Input
+                        value={codespeaksProjectFolder}
+                        onChange={(e) => setCodespeaksProjectFolder(e.target.value)}
+                        placeholder="/path/to/your/projects"
+                        className="w-full"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        The folder containing the projects you want to analyze.
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Knowledge Folder Path
+                      </label>
+                      <Input
+                        value={codespeaksKnowledgeFolder}
+                        onChange={(e) => setCodespeaksKnowledgeFolder(e.target.value)}
+                        placeholder="/path/to/store/knowledge"
+                        className="w-full"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        The folder where generated reports and knowledge will be stored.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Tools Tab */}
             {activeTab === 'tools' && (

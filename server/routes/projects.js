@@ -3,7 +3,8 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
 import os from 'os';
-import { addProjectManually } from '../projects.js';
+import { addProjectManually, getProjects } from '../projects.js';
+import { favoriteProjectsDb } from '../database/db.js';
 
 const router = express.Router();
 
@@ -374,5 +375,50 @@ function cloneGitHubRepository(githubUrl, destinationPath, githubToken = null) {
     });
   });
 }
+
+// Get all projects with favorite status
+router.get('/', async (req, res) => {
+  try {
+    const projects = await getProjects();
+    const favorites = favoriteProjectsDb.getFavorites(req.user.id);
+    const favoriteSet = new Set(favorites);
+
+    const projectsWithFavorites = projects.map(project => ({
+      ...project,
+      isFavorite: favoriteSet.has(project.path)
+    }));
+
+    res.json(projectsWithFavorites);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Toggle favorite status
+router.post('/:projectName/favorite', async (req, res) => {
+  try {
+    const { projectName } = req.params;
+    const { isFavorite } = req.body;
+    
+    // We need the project path to store in the database
+    // First try to find the project in the list
+    const projects = await getProjects();
+    const project = projects.find(p => p.name === projectName);
+    
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    if (isFavorite) {
+      favoriteProjectsDb.addFavorite(req.user.id, project.path);
+    } else {
+      favoriteProjectsDb.removeFavorite(req.user.id, project.path);
+    }
+
+    res.json({ success: true, isFavorite });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 export default router;

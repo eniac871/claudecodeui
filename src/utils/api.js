@@ -59,6 +59,11 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ displayName }),
     }),
+  toggleFavorite: (projectName, isFavorite) =>
+    authenticatedFetch(`/api/projects/${projectName}/favorite`, {
+      method: 'POST',
+      body: JSON.stringify({ isFavorite }),
+    }),
   deleteSession: (projectName, sessionId) =>
     authenticatedFetch(`/api/projects/${projectName}/sessions/${sessionId}`, {
       method: 'DELETE',

@@ -103,4 +103,38 @@ router.get('/onboarding-status', authenticateToken, async (req, res) => {
   }
 });
 
+router.get('/codespeaks-config', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const config = userDb.getCodeSpeaksConfig(userId);
+
+    res.json({
+      success: true,
+      projectFolder: config?.codespeaks_project_folder || '',
+      knowledgeFolder: config?.codespeaks_knowledge_folder || ''
+    });
+  } catch (error) {
+    console.error('Error getting codespeaks config:', error);
+    res.status(500).json({ error: 'Failed to get codespeaks configuration' });
+  }
+});
+
+router.post('/codespeaks-config', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { projectFolder, knowledgeFolder } = req.body;
+
+    userDb.updateCodeSpeaksConfig(userId, projectFolder, knowledgeFolder);
+
+    res.json({
+      success: true,
+      projectFolder,
+      knowledgeFolder
+    });
+  } catch (error) {
+    console.error('Error updating codespeaks config:', error);
+    res.status(500).json({ error: 'Failed to update codespeaks configuration' });
+  }
+});
+
 export default router;

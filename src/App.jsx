@@ -33,6 +33,7 @@ import { TaskMasterProvider } from './contexts/TaskMasterContext';
 import { TasksSettingsProvider } from './contexts/TasksSettingsContext';
 import { WebSocketProvider, useWebSocketContext } from './contexts/WebSocketContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import CodeSpeaksPage from './pages/CodeSpeaksPage';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import useLocalStorage from './hooks/useLocalStorage';
 import { api, authenticatedFetch } from './utils/api';
@@ -956,6 +957,7 @@ function App() {
                   <Routes>
                     <Route path="/" element={<AppContent />} />
                     <Route path="/session/:sessionId" element={<AppContent />} />
+                    <Route path="/codespeaks" element={<CodeSpeaksPage />} />
                   </Routes>
                 </Router>
               </ProtectedRoute>
